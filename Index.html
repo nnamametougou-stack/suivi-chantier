@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Suivi de chantier</title>
+<style>
+:root{
+  --beton:#E3E5E2; --surface:#F6F7F5; --encre:#17252B; --acier:#5B6B73;
+  --jaune:#F2B705; --ok:#2E7D5B; --alerte:#B93A2B; --trait:#C7CBC8;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--beton);color:var(--encre);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:720px;margin:0 auto;padding:16px 16px 48px}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+h1{font:700 28px/1.1 "Arial Narrow","Roboto Condensed",system-ui,sans-serif;font-stretch:condensed;margin:0;letter-spacing:.01em}
+.projet{color:var(--acier);margin:4px 0 0;font-size:14px}
+.statut{font-size:12px;padding:4px 10px;border-radius:99px;background:var(--surface);border:1px solid var(--trait);white-space:nowrap}
+.statut.ok::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:6px}
+.statut.ko::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--alerte);margin-right:6px}
+nav{display:flex;gap:4px;margin:18px 0 14px;border-bottom:2px solid var(--encre)}
+nav button{flex:1;padding:10px 6px;border:0;background:transparent;font:600 14px system-ui,sans-serif;color:var(--acier);cursor:pointer;border-radius:6px 6px 0 0}
+nav button[aria-selected="true"]{background:var(--encre);color:var(--surface)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--jaune);outline-offset:2px}
+.panel[hidden]{display:none}
+.carte{background:var(--surface);border:1px solid var(--trait);border-radius:8px;padding:16px;margin-bottom:14px}
+.global .chiffres{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.global .grand{font:700 56px/1 "Arial Narrow","Roboto Condensed",system-ui,sans-serif;font-stretch:condensed}
+.global .grand small{font-size:24px}
+.global .meta{color:var(--acier);font-size:14px}
+.bande{position:relative;height:22px;background:#d3d6d3;border-radius:3px;margin:12px 0 6px;overflow:hidden}
+.bande .rempli{height:100%;background:repeating-linear-gradient(135deg,var(--jaune) 0 9px,var(--encre) 9px 18px);transition:width .5s}
+.repere{position:absolute;top:-3px;bottom:-3px;width:3px;background:var(--encre);box-shadow:0 0 0 1px var(--surface)}
+.legende{display:flex;justify-content:space-between;font-size:12px;color:var(--acier)}
+.badge{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px}
+.b-retard{background:#f3d6d1;color:var(--alerte)}
+.b-ok{background:#d5e8de;color:var(--ok)}
+.b-neutre{background:#e1e4e2;color:var(--acier)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stats div{background:var(--surface);border:1px solid var(--trait);border-radius:8px;padding:12px}
+.stats strong{display:block;font-size:22px;line-height:1.1}
+.stats span{font-size:12px;color:var(--acier)}
+h2{font-size:16px;margin:0 0 10px}
+.lot{padding:12px 0;border-top:1px solid var(--trait)}
+.lot:first-of-type{border-top:0}
+.lot-tete{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.lot-nom{font-weight:600}
+.lot .bande{height:10px;margin:8px 0 4px}
+.lot .bande .rempli{background:var(--acier)}
+.lot.fini .bande .rempli{background:var(--ok)}
+.lot.retard .bande .rempli{background:var(--alerte)}
+.lot-pied{display:flex;justify-content:space-between;font-size:12px;color:var(--acier)}
+svg{width:100%;height:auto;display:block}
+label{display:block;font-weight:600;font-size:14px;margin:12px 0 4px}
+input,select,textarea{width:100%;padding:10px;border:1px solid var(--acier);border-radius:6px;background:#fff;font:inherit;color:var(--encre)}
+.ligne{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.curseur{display:grid;grid-template-columns:1fr 84px;gap:12px;align-items:center}
+input[type=range]{padding:0;accent-color:var(--encre)}
+.btn{margin-top:18px;width:100%;padding:14px;border:0;border-radius:6px;background:var(--encre);color:var(--surface);font:700 16px system-ui,sans-serif;cursor:pointer}
+.btn.sec{background:transparent;color:var(--encre);border:1px solid var(--encre);margin-top:10px;padding:10px;font-size:14px}
+.btn.danger{color:var(--alerte);border-color:var(--alerte)}
+.erreur{color:var(--alerte);font-size:14px;margin-top:8px;min-height:20px}
+.rel{padding:12px 0;border-top:1px solid var(--trait)}
+.rel:first-of-type{border-top:0}
+.rel-tete{display:flex;justify-content:space-between;gap:8px}
+.rel p{margin:4px 0 0;font-size:14px;color:var(--acier)}
+.suppr{border:0;background:transparent;color:var(--alerte);font-size:13px;cursor:pointer;text-decoration:underline}
+.vide{color:var(--acier);text-align:center;padding:20px 0}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--encre);color:var(--surface);padding:10px 18px;border-radius:6px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .25s}
+#toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Suivi de chantier</h1>
+      <p class="projet" id="nomProjet"></p>
+    </div>
+    <span class="statut ok" id="statut" role="status">Chargement…</span>
+  </header>
+
+  <nav role="tablist" aria-label="Sections">
+    <button role="tab" id="t-dash" aria-selected="true" aria-controls="p-dash">Tableau de bord</button>
+    <button role="tab" id="t-saisie" aria-selected="false" aria-controls="p-saisie">Nouveau relevé</button>
+    <button role="tab" id="t-journal" aria-selected="false" aria-controls="p-journal">Journal</button>
+  </nav>
+
+  <section class="panel" id="p-dash" role="tabpanel" aria-labelledby="t-dash"></section>
+
+  <section class="panel" id="p-saisie" role="tabpanel" aria-labelledby="t-saisie" hidden>
+    <div class="carte">
+      <h2>Enregistrer l'avancement d'un lot</h2>
+      <label for="fDate">Date du relevé</label>
+      <input type="date" id="fDate">
+      <label for="fLot">Lot de travaux</label>
+      <select id="fLot"></select>
+      <label for="fPct">Avancement cumulé du lot</label>
+      <div class="curseur">
+        <input type="range" id="fRange" min="0" max="100" step="5" value="0" aria-label="Avancement en pourcentage">
+        <input type="number" id="fPct" min="0" max="100" step="1" value="0" inputmode="numeric" aria-label="Avancement en %">
+      </div>
+      <div class="ligne">
+        <div><label for="fEff">Ouvriers présents</label><input type="number" id="fEff" min="0" value="10" inputmode="numeric"></div>
+        <div><label for="fMeteo">Météo</label>
+          <select id="fMeteo"><option>Ensoleillé</option><option>Nuageux</option><option>Pluie</option></select></div>
+      </div>
+      <label for="fAuteur">Saisi par</label>
+      <input type="text" id="fAuteur" placeholder="Nom du conducteur de travaux">
+      <label for="fNote">Observation (facultatif)</label>
+      <textarea id="fNote" rows="3" placeholder="Ex. : livraison de ciment retardée, coulage reporté à demain"></textarea>
+      <div class="erreur" id="fErreur" role="alert"></div>
+      <button class="btn" id="fSave">Enregistrer le relevé</button>
+    </div>
+  </section>
+
+  <section class="panel" id="p-journal" role="tabpanel" aria-labelledby="t-journal" hidden></section>
+</div>
+<div id="toast" aria-live="polite"></div>
+
+<script>
+const DAY = 864e5, KEY = 'chantier:v1';
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const toT = s => new Date(s + 'T12:00:00').getTime();
+const iso = t => new Date(t).toISOString().slice(0, 10);
+const now = new Date(); now.setHours(12, 0, 0, 0);
+const TODAY = iso(now.getTime());
+const off = n => iso(now.getTime() + n * DAY);
+const fmt = s => new Date(s + 'T12:00:00').toLocaleDateString('fr-FR', {day: '2-digit', month: 'short'});
+const fmtLong = s => new Date(s + 'T12:00:00').toLocaleDateString('fr-FR', {day: '2-digit', month: 'short', year: 'numeric'});
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+let state = null;
+
+/* ---------- Données de démonstration ---------- */
+function seed() {
+  const L = [
+    ['Installation de chantier', 3, -56, -46],
+    ['Terrassement', 5, -50, -36],
+    ['Fondations', 15, -40, -12],
+    ['Élévation du rez-de-chaussée', 15, -14, 14],
+    ['Dalle du plancher R+1', 12, 8, 30],
+    ['Élévation de l\'étage', 12, 28, 56],
+    ['Charpente et toiture', 12, 52, 72],
+    ['Plomberie et électricité', 10, 40, 80],
+    ['Enduits et carrelage', 10, 60, 90],
+    ['Peinture et finitions', 6, 80, 100]
+  ];
+  const lots = L.map((l, i) => ({id: 'L' + (i + 1), nom: l[0], poids: l[1], debut: off(l[2]), fin: off(l[3])}));
+  const R = [
+    ['L1', -46, 100, 6, 'Ensoleillé'], ['L2', -42, 60, 8, 'Ensoleillé'], ['L2', -36, 100, 8, 'Nuageux'],
+    ['L3', -30, 40, 14, 'Ensoleillé'], ['L3', -20, 75, 16, 'Pluie'], ['L3', -10, 100, 15, 'Ensoleillé'],
+    ['L4', -10, 15, 12, 'Ensoleillé'], ['L4', -4, 28, 13, 'Pluie'], ['L4', -1, 38, 12, 'Nuageux']
+  ];
+  const notes = {'L3|-20': 'Pluie : coulage des semelles reporté d\'une journée', 'L4|-4': 'Pluie : arrêt des travaux l\'après-midi'};
+  const releves = R.map((r, i) => ({
+    id: 'R' + (i + 1), date: off(r[1]), lotId: r[0], pct: r[2], effectif: r[3], meteo: r[4],
+    note: notes[r[0] + '|' + r[1]] || '', auteur: 'Conducteur de travaux'
+  }));
+  return {projet: {nom: 'Bâtiment R+1 de 4 appartements', debut: off(-56), fin: off(100)}, lots, releves, seq: R.length + 1};
+}
+
+/* ---------- Stockage (navigateur) ---------- */
+function statut(txt, ok) {
+  const el = $('#statut'); el.textContent = txt; el.className = 'statut ' + (ok ? 'ok' : 'ko');
+}
+async function charger() {
+  try {
+    const v = localStorage.getItem(KEY);
+    if (v) { state = JSON.parse(v); statut('Enregistré sur cet appareil', true); return; }
+  } catch (e) { /* stockage indisponible ou données illisibles */ }
+  state = seed();
+  await sauver();
+}
+async function sauver() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(state));
+    statut('Enregistré sur cet appareil', true);
+  } catch (e) {
+    statut('Non sauvegardé (mode privé ?)', false);
+  }
+}
+
+/* ---------- Calculs ---------- */
+function reel(lotId, jusqua) {
+  const l = state.releves.filter(r => r.lotId === lotId && (!jusqua || r.date <= jusqua))
+    .sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.id.localeCompare(b.id, undefined, {numeric: true}));
+  return l.length ? l[l.length - 1].pct : 0;
+}
+function prevu(lot, t) {
+  const d = toT(lot.debut), f = toT(lot.fin);
+  if (t <= d) return 0; if (t >= f) return 100;
+  return (t - d) / (f - d) * 100;
+}
+function globalPct(fn) {
+  const tot = state.lots.reduce((s, l) => s + l.poids, 0);
+  return state.lots.reduce((s, l) => s + l.poids * fn(l), 0) / tot;
+}
+const reelGlobal = d => globalPct(l => reel(l.id, d));
+const prevuGlobal = t => globalPct(l => prevu(l, t));
+
+function etat(lot) {
+  const r = reel(lot.id), p = prevu(lot, toT(TODAY)), e = r - p;
+  if (r >= 100) return {cls: 'fini', txt: 'Terminé', b: 'b-ok', e};
+  if (p === 0 && r === 0) return {cls: '', txt: 'À venir', b: 'b-neutre', e};
+  if (e < -10) return {cls: 'retard', txt: 'Retard de ' + Math.round(-e) + ' pts', b: 'b-retard', e};
+  if (e > 10) return {cls: '', txt: 'Avance de ' + Math.round(e) + ' pts', b: 'b-ok', e};
+  return {cls: '', txt: 'Dans les temps', b: 'b-ok', e};
+}
+
+/* ---------- Rendu ---------- */
+function courbe() {
+  const W = 600, H = 220, m = {l: 38, r: 10, t: 10, b: 28};
+  const t0 = toT(state.projet.debut), t1 = toT(state.projet.fin), tj = toT(TODAY);
+  const x = t => m.l + (t - t0) / (t1 - t0) * (W - m.l - m.r);
+  const y = v => H - m.b - v / 100 * (H - m.t - m.b);
+  const step = 7 * DAY;
+  let pp = [], pa = [];
+  for (let t = t0; t <= t1; t += step) pp.push(x(t).toFixed(1) + ',' + y(prevuGlobal(t)).toFixed(1));
+  pp.push(x(t1).toFixed(1) + ',' + y(prevuGlobal(t1)).toFixed(1));
+  for (let t = t0; t <= tj; t += step) pa.push(x(t).toFixed(1) + ',' + y(reelGlobal(iso(t))).toFixed(1));
+  pa.push(x(tj).toFixed(1) + ',' + y(reelGlobal(TODAY)).toFixed(1));
+  const grille = [0, 25, 50, 75, 100].map(v => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="#C7CBC8"/><text x="${m.l - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#5B6B73">${v}%</text>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Courbe d'avancement prévu et réalisé">
+    ${grille}
+    <line x1="${x(tj)}" x2="${x(tj)}" y1="${m.t}" y2="${H - m.b}" stroke="#17252B" stroke-dasharray="3 3"/>
+    <polyline points="${pp.join(' ')}" fill="none" stroke="#5B6B73" stroke-width="2" stroke-dasharray="6 4"/>
+    <polyline points="${pa.join(' ')}" fill="none" stroke="#17252B" stroke-width="3.5"/>
+    <text x="${m.l}" y="${H - 8}" font-size="11" fill="#5B6B73">${fmt(state.projet.debut)}</text>
+    <text x="${x(tj)}" y="${H - 8}" font-size="11" text-anchor="middle" fill="#17252B">Aujourd'hui</text>
+    <text x="${W - m.r}" y="${H - 8}" font-size="11" text-anchor="end" fill="#5B6B73">${fmt(state.projet.fin)}</text>
+  </svg>
+  <div class="legende" style="justify-content:flex-start;gap:16px;margin-top:6px"><span>Trait plein : réalisé</span><span>Pointillés : prévu</span></div>`;
+}
+
+function dash() {
+  const r = reelGlobal(), p = prevuGlobal(toT(TODAY)), e = r - p;
+  const rel = state.releves;
+  const eff = rel.length ? Math.round(rel.reduce((s, x) => s + x.effectif, 0) / rel.length) : 0;
+  const pluie = new Set(rel.filter(x => x.meteo === 'Pluie').map(x => x.date)).size;
+  const retards = state.lots.filter(l => etat(l).cls === 'retard');
+  const badge = e < -5 ? `<span class="badge b-retard">Retard de ${Math.abs(e).toFixed(1)} pts</span>`
+    : e > 5 ? `<span class="badge b-ok">Avance de ${e.toFixed(1)} pts</span>` : `<span class="badge b-ok">Dans les temps</span>`;
+  const lots = state.lots.map(l => {
+    const s = etat(l), rr = reel(l.id), pp = prevu(l, toT(TODAY));
+    return `<div class="lot ${s.cls}">
+      <div class="lot-tete"><span class="lot-nom">${esc(l.nom)}</span><span class="badge ${s.b}">${s.txt}</span></div>
+      <div class="bande" aria-label="Réalisé ${rr}%, prévu ${Math.round(pp)}%"><div class="rempli" style="width:${rr}%"></div>${pp > 0 && pp < 100 ? `<div class="repere" style="left:${pp}%"></div>` : ''}</div>
+      <div class="lot-pied"><span>Réalisé ${rr} % · prévu ${Math.round(pp)} %</span><span>${fmt(l.debut)} au ${fmt(l.fin)}</span></div>
+    </div>`;
+  }).join('');
+  $('#p-dash').innerHTML = `
+    <div class="carte global">
+      <div class="chiffres"><span class="grand">${r.toFixed(1)}<small> %</small></span>${badge}</div>
+      <div class="meta">Avancement global pondéré par le poids de chaque lot</div>
+      <div class="bande" aria-label="Avancement global ${r.toFixed(1)}%"><div class="rempli" style="width:${r}%"></div><div class="repere" style="left:${p}%"></div></div>
+      <div class="legende"><span>Prévu aujourd'hui : ${p.toFixed(1)} %</span><span>Fin prévue le ${fmtLong(state.projet.fin)}</span></div>
+    </div>
+    <div class="stats">
+      <div><strong>${eff}</strong><span>ouvriers en moyenne</span></div>
+      <div><strong>${pluie}</strong><span>jours de pluie</span></div>
+      <div><strong>${retards.length}</strong><span>lots en retard</span></div>
+    </div>
+    <div class="carte" style="margin-top:14px"><h2>Courbe d'avancement</h2>${courbe()}</div>
+    <div class="carte"><h2>Avancement par lot</h2>${lots}</div>`;
+}
+
+function journal() {
+  const l = [...state.releves].sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+  const nom = id => (state.lots.find(x => x.id === id) || {}).nom || id;
+  $('#p-journal').innerHTML = `<div class="carte"><h2>Relevés enregistrés (${l.length})</h2>` +
+    (l.length ? l.map(r => `<div class="rel">
+      <div class="rel-tete"><strong>${esc(nom(r.lotId))} : ${r.pct} %</strong><span>${fmtLong(r.date)}</span></div>
+      <p>${r.effectif} ouvriers · ${esc(r.meteo)}${r.auteur ? ' · ' + esc(r.auteur) : ''}</p>
+      ${r.note ? `<p>${esc(r.note)}</p>` : ''}
+      <button class="suppr" data-id="${r.id}">Supprimer ce relevé</button>
+    </div>`).join('') : '<div class="vide">Aucun relevé pour le moment. Ajoutez le premier depuis l\'onglet « Nouveau relevé ».</div>') +
+    `<button class="btn sec" id="csv">Exporter en CSV</button>
+     <button class="btn sec danger" id="reset">Réinitialiser les données de démonstration</button></div>`;
+  document.querySelectorAll('.suppr').forEach(b => b.onclick = async () => {
+    state.releves = state.releves.filter(r => r.id !== b.dataset.id);
+    await sauver(); toast('Relevé supprimé'); rendre();
+  });
+  $('#csv').onclick = exporter;
+  $('#reset').onclick = async () => {
+    if (!confirm('Remplacer toutes les données par les données de démonstration ?')) return;
+    state = seed(); await sauver(); toast('Données réinitialisées'); rendre(); remplirForm();
+  };
+}
+
+function exporter() {
+  const nom = id => (state.lots.find(x => x.id === id) || {}).nom || id;
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const rows = [['Date', 'Lot', 'Avancement %', 'Ouvriers', 'Météo', 'Saisi par', 'Observation']]
+    .concat([...state.releves].sort((a, b) => a.date < b.date ? -1 : 1).map(r => [r.date, nom(r.lotId), r.pct, r.effectif, r.meteo, r.auteur, r.note]));
+  const csv = '\ufeff' + rows.map(r => r.map(q).join(';')).join('\r\n');
+  try {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8'}));
+    a.download = 'releves-chantier.csv'; a.click();
+    toast('Export CSV lancé');
+  } catch (e) { toast('Export impossible dans cet environnement'); }
+}
+
+function toast(m) {
+  const t = $('#toast'); t.textContent = m; t.classList.add('on');
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 2200);
+}
+
+function rendre() { $('#nomProjet').textContent = state.projet.nom; dash(); journal(); }
+
+/* ---------- Formulaire ---------- */
+function remplirForm() {
+  $('#fLot').innerHTML = state.lots.map(l => `<option value="${l.id}">${esc(l.nom)}</option>`).join('');
+  $('#fDate').value = TODAY; $('#fDate').max = TODAY;
+  majPct();
+}
+function majPct() { const v = reel($('#fLot').value); $('#fPct').value = v; $('#fRange').value = v; }
+$('#fLot').onchange = majPct;
+$('#fRange').oninput = e => $('#fPct').value = e.target.value;
+$('#fPct').oninput = e => $('#fRange').value = clamp(+e.target.value || 0, 0, 100);
+
+$('#fSave').onclick = async () => {
+  const err = $('#fErreur'); err.textContent = '';
+  const date = $('#fDate').value, lotId = $('#fLot').value;
+  const pct = Math.round(+$('#fPct').value), eff = Math.round(+$('#fEff').value);
+  if (!date) return err.textContent = 'Choisissez la date du relevé.';
+  if (date > TODAY) return err.textContent = 'La date ne peut pas être dans le futur.';
+  if (isNaN(pct) || pct < 0 || pct > 100) return err.textContent = 'L\'avancement doit être compris entre 0 et 100 %.';
+  if (isNaN(eff) || eff < 0) return err.textContent = 'Indiquez le nombre d\'ouvriers présents (0 ou plus).';
+  const avant = reel(lotId, date);
+  if (pct < avant) return err.textContent = 'L\'avancement cumulé ne peut pas baisser : le dernier relevé de ce lot indique ' + avant + ' %.';
+  state.releves.push({id: 'R' + (state.seq++), date, lotId, pct, effectif: eff, meteo: $('#fMeteo').value,
+    note: $('#fNote').value.trim(), auteur: $('#fAuteur').value.trim()});
+  $('#fNote').value = '';
+  await sauver(); rendre(); toast('Relevé enregistré'); onglet('dash');
+};
+
+/* ---------- Onglets ---------- */
+function onglet(id) {
+  document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-selected', b.id === 't-' + id));
+  document.querySelectorAll('.panel').forEach(p => p.hidden = p.id !== 'p-' + id);
+}
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => onglet(b.id.slice(2)));
+
+(async () => { await charger(); remplirForm(); rendre(); })();
+</script>
+</body>
+</html>
